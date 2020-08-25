@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"strings"
 )
 
 var defaultTmpl string = `
@@ -40,12 +41,25 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tpl := template.Must(template.New("").Parse(defaultTmpl))
-	err := tpl.Execute(w, h.s["intro"])
-
-	if err != nil {
-		panic(err)
+	path := strings.TrimSpace(r.URL.Path)
+	if path == "" || path == "/" {
+		path = "/intro"
 	}
+
+	path = path[1:]
+
+	if chapter, ok := h.s[path]; ok {
+		tpl := template.Must(template.New("").Parse(defaultTmpl))
+		err := tpl.Execute(w, chapter)
+
+		if err != nil {
+			http.Error(w, "Something went wrong ...", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	http.Error(w, "Chapter not found", http.StatusNotFound)
+
 }
 
 func JSONStory(r io.Reader) (Story, error) {
