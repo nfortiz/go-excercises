@@ -17,8 +17,34 @@ var defaultTmpl string = `
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Choose Your Own Adventure</title>
+	<style>
+		body { font-family: helvetica, arial; }
+		h1 {
+			text-align: center;	
+			position: relative;	
+		}
+		.page {
+			width: 80%;
+			max-width: 500px;
+			margin: auto;
+			margin-top: 40px;
+			margin-bottom: 40px;
+			padding: 80px;
+			background: #FFFCF6;
+			border: 1px solid #eee;
+			box-shadow: 0 10px 6px -6px #777;
+		}
+		ul {
+			border-top: 1px dotted #ccc;
+			padding: 10px 0 0 0;
+		}
+		li {
+			padding-top: 10px;
+		}
+	</style>
 </head>
 <body>
+	<section class="page">
     <h1>{{.Title}}</h1>
     {{range .Paragraphs}}
         <p>{{.}}</p>
@@ -28,16 +54,31 @@ var defaultTmpl string = `
             <li><a href="/{{.Chapter}}">{{.Text}}</a></li>
         {{end}}
     </ul>
+	</section>
 </body>
 </html>
 `
+var tpl = template.Must(template.New("").Parse(defaultTmpl))
 
-func NewHandler (s Story) http.Handler {
-	return handler{s}
+type HandlerOption func (h *handler)
+
+func WithTemplate(t *template.Template) HandlerOption {
+	return func (h *handler) {
+		h.t = t
+	}
+}
+
+func NewHandler (s Story, opts ...HandlerOption) http.Handler {
+	h := handler{s, tpl}
+	for _, opt := range opts {
+		opt(&h)
+	}
+	return h
 }
 
 type handler struct {
 	s Story
+	t *template.Template
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -49,8 +90,8 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path = path[1:]
 
 	if chapter, ok := h.s[path]; ok {
-		tpl := template.Must(template.New("").Parse(defaultTmpl))
-		err := tpl.Execute(w, chapter)
+
+		err := h.t.Execute(w, chapter)
 
 		if err != nil {
 			http.Error(w, "Something went wrong ...", http.StatusInternalServerError)
